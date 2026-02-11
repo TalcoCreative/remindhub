@@ -1,9 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { statusLabels, type LeadStatus } from '@/data/dummy';
-import { Users, TrendingUp, Recycle, DollarSign, Clock, BarChart3, ArrowUpRight, Loader2 } from 'lucide-react';
+import { Users, TrendingUp, Recycle, DollarSign, BarChart3, ArrowUpRight, Loader2, MessageCircle, CheckCircle2, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLeads } from '@/hooks/useLeads';
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 function StatCard({ title, value, subtitle, icon: Icon }: {
   title: string; value: string | number; subtitle?: string; icon: React.ElementType;
@@ -26,14 +30,25 @@ function StatCard({ title, value, subtitle, icon: Icon }: {
 
 const funnelSteps: { key: LeadStatus; color: string }[] = [
   { key: 'new', color: 'bg-info' },
+  { key: 'not_followed_up', color: 'bg-warning' },
+  { key: 'followed_up', color: 'bg-secondary' },
   { key: 'in_progress', color: 'bg-primary' },
   { key: 'picked_up', color: 'bg-accent' },
+  { key: 'sign_contract', color: 'bg-primary' },
   { key: 'completed', color: 'bg-success' },
   { key: 'lost', color: 'bg-destructive' },
 ];
 
 export default function Dashboard() {
   const { data: leads = [], isLoading } = useLeads();
+  const { data: chats = [] } = useQuery({
+    queryKey: ['chats'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('chats').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const stats = useMemo(() => {
     const totalKg = leads.reduce((s, l) => s + (Number(l.actual_kg) || Number(l.estimated_kg) || 0), 0);
@@ -42,8 +57,9 @@ export default function Dashboard() {
     const deals = leads.filter((l) => l.status === 'completed');
     const revenue = deals.reduce((s, l) => s + (Number(l.final_value) || Number(l.deal_value) || 0), 0);
     const conversion = leads.length > 0 ? Math.round((deals.length / leads.length) * 100) : 0;
+    const answered = chats.filter((c) => c.unread === 0).length;
+    const unanswered = chats.filter((c) => c.unread > 0).length;
 
-    // Source attribution
     const sourceMap: Record<string, { count: number; kg: number; value: number }> = {};
     for (const l of leads) {
       const src = l.source || 'manual';
@@ -54,8 +70,8 @@ export default function Dashboard() {
     }
     const topSource = Object.entries(sourceMap).sort((a, b) => b[1].count - a[1].count)[0];
 
-    return { totalKg, b2cKg, b2bKg, revenue, conversion, deals: deals.length, sourceMap, topSource };
-  }, [leads]);
+    return { totalKg, b2cKg, b2bKg, revenue, conversion, deals: deals.length, sourceMap, topSource, answered, unanswered };
+  }, [leads, chats]);
 
   const funnelData = funnelSteps.map((s) => ({
     ...s,
@@ -68,9 +84,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Overview of RemindHub operations</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Overview of RemindHub operations</p>
+        </div>
+        <Link to="/dashboard-detail">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Eye className="h-4 w-4" /> Detail & Charts
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -78,6 +101,14 @@ export default function Dashboard() {
         <StatCard title="Total KG Collected" value={`${stats.totalKg.toLocaleString()} kg`} subtitle={`B2C: ${stats.b2cKg.toLocaleString()} · B2B: ${stats.b2bKg.toLocaleString()}`} icon={Recycle} />
         <StatCard title="Revenue" value={`Rp ${(stats.revenue / 1e6).toFixed(0)}M`} icon={DollarSign} />
         <StatCard title="Conversion Rate" value={`${stats.conversion}%`} subtitle={`${stats.deals} deals closed`} icon={TrendingUp} />
+      </div>
+
+      {/* Answered / Unanswered */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Answered Chats" value={stats.answered} icon={CheckCircle2} />
+        <StatCard title="Unanswered Chats" value={stats.unanswered} icon={MessageCircle} />
+        <StatCard title="New Leads" value={leads.filter((l) => l.status === 'new').length} icon={Users} />
+        <StatCard title="In Progress" value={leads.filter((l) => l.status === 'in_progress').length} icon={BarChart3} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -105,7 +136,7 @@ export default function Dashboard() {
         {/* Source Attribution */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Clock className="h-4 w-4 text-primary" /> Source Attribution</CardTitle>
+            <CardTitle className="text-base">Source Attribution</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {stats.topSource && (
@@ -125,20 +156,6 @@ export default function Dashboard() {
                   <Badge variant="secondary">{data.count}</Badge>
                 </div>
               ))}
-            </div>
-            <div className="mt-3">
-              <p className="mb-2 text-sm font-medium text-muted-foreground">Recent Leads</p>
-              <div className="space-y-2">
-                {leads.slice(0, 4).map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                    <div>
-                      <p className="text-sm font-medium">{lead.name}</p>
-                      <p className="text-xs text-muted-foreground">{lead.area} · {lead.estimated_kg} kg</p>
-                    </div>
-                    <Badge variant="secondary" className="text-xs capitalize">{lead.status.replace('_', ' ')}</Badge>
-                  </div>
-                ))}
-              </div>
             </div>
           </CardContent>
         </Card>
