@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      broadcast_logs: {
+        Row: {
+          created_at: string
+          delivery_status: string
+          filters: Json
+          id: string
+          message_template: string
+          mode: string
+          recipient_phones: string[] | null
+          sent_at: string
+          sent_by: string
+          total_recipients: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_status?: string
+          filters?: Json
+          id?: string
+          message_template: string
+          mode?: string
+          recipient_phones?: string[] | null
+          sent_at?: string
+          sent_by: string
+          total_recipients?: number
+        }
+        Update: {
+          created_at?: string
+          delivery_status?: string
+          filters?: Json
+          id?: string
+          message_template?: string
+          mode?: string
+          recipient_phones?: string[] | null
+          sent_at?: string
+          sent_by?: string
+          total_recipients?: number
+        }
+        Relationships: []
+      }
       chats: {
         Row: {
           assigned_pic: string | null
@@ -57,6 +96,78 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "chats_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          area: string | null
+          assigned_pic: string | null
+          chat_id: string | null
+          company: string | null
+          created_at: string
+          id: string
+          is_contacted: boolean
+          last_contacted: string | null
+          lead_id: string | null
+          name: string
+          notes: string | null
+          phone: string
+          source: string | null
+          sources: string[] | null
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          area?: string | null
+          assigned_pic?: string | null
+          chat_id?: string | null
+          company?: string | null
+          created_at?: string
+          id?: string
+          is_contacted?: boolean
+          last_contacted?: string | null
+          lead_id?: string | null
+          name: string
+          notes?: string | null
+          phone: string
+          source?: string | null
+          sources?: string[] | null
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area?: string | null
+          assigned_pic?: string | null
+          chat_id?: string | null
+          company?: string | null
+          created_at?: string
+          id?: string
+          is_contacted?: boolean
+          last_contacted?: string | null
+          lead_id?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string
+          source?: string | null
+          sources?: string[] | null
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
