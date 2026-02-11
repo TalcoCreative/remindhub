@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import DashboardDetail from "./pages/DashboardDetail";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import Leads from "./pages/Leads";
 import FormManager from "./pages/FormManager";
@@ -36,6 +37,7 @@ function ProtectedRoutes() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard-detail" element={<DashboardDetail />} />
         <Route path="/inbox" element={<WhatsAppInbox />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/forms" element={<FormManager />} />

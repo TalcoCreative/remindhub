@@ -8,15 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Wifi, WifiOff, Key, Globe, Shield, UserPlus, Loader2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Wifi, WifiOff, Key, Globe, Shield, UserPlus, Loader2, Users, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export default function Settings() {
   const { toast } = useToast();
   const { session } = useAuth();
+  const qc = useQueryClient();
   const [liveMode, setLiveMode] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [secret, setSecret] = useState('');
@@ -25,7 +28,6 @@ export default function Settings() {
   const [inviteForm, setInviteForm] = useState({ email: '', password: '', display_name: '', role: 'operator' });
   const [inviting, setInviting] = useState(false);
 
-  // Check if current user is admin
   const { data: isAdmin } = useQuery({
     queryKey: ['is-admin'],
     queryFn: async () => {
@@ -35,18 +37,57 @@ export default function Settings() {
     enabled: !!session?.user?.id,
   });
 
+  // Fetch all users (profiles + roles)
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['all-users'],
+    enabled: !!isAdmin,
+    queryFn: async () => {
+      const { data: profiles, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      const { data: roles } = await supabase.from('user_roles').select('*');
+      // Get lead counts per user (assigned_pic)
+      const { data: leads } = await supabase.from('leads').select('assigned_pic');
+      const { data: chats } = await supabase.from('chats').select('assigned_pic');
+
+      return profiles.map((p) => {
+        const userRoles = roles?.filter((r) => r.user_id === p.user_id) ?? [];
+        const leadsHandled = leads?.filter((l) => l.assigned_pic === p.display_name).length ?? 0;
+        const chatsHandled = chats?.filter((c) => c.assigned_pic === p.display_name).length ?? 0;
+        return {
+          ...p,
+          roles: userRoles.map((r) => r.role),
+          roleId: userRoles[0]?.id,
+          leadsHandled,
+          chatsHandled,
+        };
+      });
+    },
+  });
+
+  const updateRole = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: string }) => {
+      // Delete existing role and insert new one
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: newRole as 'admin' | 'operator' | 'viewer' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-users'] });
+      toast({ title: 'Role Updated' });
+    },
+  });
+
   const handleInvite = async () => {
     if (!inviteForm.email || !inviteForm.password) return;
     setInviting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('invite-user', {
-        body: inviteForm,
-      });
+      const { data, error } = await supabase.functions.invoke('invite-user', { body: inviteForm });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({ title: 'User Created', description: `${inviteForm.email} has been added.` });
       setShowInvite(false);
       setInviteForm({ email: '', password: '', display_name: '', role: 'operator' });
+      qc.invalidateQueries({ queryKey: ['all-users'] });
     } catch (err: unknown) {
       toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' });
     }
@@ -60,11 +101,107 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Configure RemindHub integrations and preferences</p>
       </div>
 
-      <Tabs defaultValue="whatsapp">
+      <Tabs defaultValue="users">
         <TabsList>
-          <TabsTrigger value="whatsapp">WhatsApp Integration</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp Integration</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="users" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4 text-primary" /> Team Members</CardTitle>
+                  <CardDescription>Manage users and their roles.</CardDescription>
+                </div>
+                {isAdmin && (
+                  <Button size="sm" className="gap-1.5" onClick={() => setShowInvite(true)}>
+                    <UserPlus className="h-4 w-4" /> Add User
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {usersLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-right">Leads</TableHead>
+                      <TableHead className="text-right">Chats</TableHead>
+                      {isAdmin && <TableHead className="w-10" />}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{u.display_name || 'Unknown'}</p>
+                            <p className="text-xs text-muted-foreground">{u.user_id.slice(0, 8)}...</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.roles[0] === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                            {u.roles[0] || 'operator'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{u.leadsHandled}</TableCell>
+                        <TableCell className="text-right">{u.chatsHandled}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {['admin', 'operator', 'viewer'].map((role) => (
+                                  <DropdownMenuItem key={role} onClick={() => updateRole.mutate({ userId: u.user_id, newRole: role })}>
+                                    Set as <span className="ml-1 capitalize font-medium">{role}</span>
+                                    {u.roles[0] === role && <span className="ml-auto text-primary">✓</span>}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                    {users.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No users found.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-primary" /> Role Definitions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { role: 'Admin', desc: 'Full access to all modules, settings, and user management.' },
+                { role: 'Operator', desc: 'Access to inbox, leads, and operations. Cannot change settings.' },
+                { role: 'Viewer', desc: 'Read-only access to dashboard and reports.' },
+              ].map((r) => (
+                <div key={r.role} className="flex items-start gap-3 rounded-lg border border-border p-3">
+                  <Badge variant="secondary">{r.role}</Badge>
+                  <p className="text-sm text-muted-foreground">{r.desc}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="whatsapp" className="mt-4 space-y-4">
           <Card>
@@ -120,38 +257,6 @@ export default function Settings() {
                 <Badge>Qontak Mekari</Badge>
                 <Badge variant="outline">Meta WABA (Future)</Badge>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-primary" /> Roles & Permissions</CardTitle>
-              <CardDescription>Manage team members and their access levels.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {[
-                  { role: 'Admin', desc: 'Full access to all modules, settings, and user management.' },
-                  { role: 'Operator', desc: 'Access to inbox, leads, and operations. Cannot change settings.' },
-                  { role: 'Viewer', desc: 'Read-only access to dashboard and reports.' },
-                ].map((r) => (
-                  <div key={r.role} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                    <Badge variant="secondary">{r.role}</Badge>
-                    <p className="text-sm text-muted-foreground">{r.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              {isAdmin && (
-                <Button className="gap-1.5" onClick={() => setShowInvite(true)}>
-                  <UserPlus className="h-4 w-4" /> Add New User
-                </Button>
-              )}
-              {!isAdmin && (
-                <p className="text-sm text-muted-foreground">Only admins can add new users.</p>
-              )}
             </CardContent>
           </Card>
         </TabsContent>

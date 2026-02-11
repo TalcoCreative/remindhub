@@ -9,7 +9,7 @@ export type LeadStatus =
   | 'lost'
   | 'cancelled';
 
-export type LeadSource = 'whatsapp' | 'web' | 'instagram' | 'referral' | 'campaign' | 'partner' | 'manual';
+export type LeadSource = 'whatsapp' | 'web' | 'instagram' | 'referral' | 'campaign' | 'partner' | 'manual' | 'tiktok' | 'event' | 'friend';
 export type LeadType = 'b2c' | 'b2b';
 
 export interface Lead {
@@ -91,6 +91,9 @@ export const sourceLabels: Record<LeadSource, string> = {
   campaign: 'Campaign',
   partner: 'Partner',
   manual: 'Manual',
+  tiktok: 'TikTok',
+  event: 'Event',
+  friend: 'Friend',
 };
 
 export const picList = ['Andi', 'Budi', 'Citra', 'Dewi', 'Eko'];
