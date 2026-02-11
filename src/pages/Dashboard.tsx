@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { statusLabels, type LeadStatus } from '@/data/dummy';
-import { Users, TrendingUp, Recycle, DollarSign, BarChart3, ArrowUpRight, Loader2, MessageCircle, CheckCircle2, Eye, Clock, Timer, ArrowRight } from 'lucide-react';
+import { Users, Recycle, DollarSign, BarChart3, ArrowUpRight, Loader2, MessageCircle, CheckCircle2, Eye, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLeads } from '@/hooks/useLeads';
 import { useMemo } from 'react';
@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const funnelOrder: LeadStatus[] = ['new', 'not_followed_up', 'followed_up', 'in_progress', 'picked_up', 'sign_contract', 'completed'];
+
 
 function formatDuration(ms: number): string {
   if (ms <= 0) return '-';
@@ -62,19 +62,6 @@ export default function Dashboard() {
     },
   });
 
-  const { data: auditLogs = [] } = useQuery({
-    queryKey: ['audit-logs-status'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lead_audit_log')
-        .select('lead_id, old_value, new_value, created_at')
-        .eq('field_name', 'status')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-  });
-
   // Filter leads created today
   const todayLeads = useMemo(() => {
     const now = new Date();
@@ -111,53 +98,6 @@ export default function Dashboard() {
     return { totalKg, b2cKg, b2bKg, revenue, conversion, deals: deals.length, sourceMap, topSource, answered, unanswered, avgResponseMs };
   }, [todayLeads, chats]);
 
-  // Calculate per-transition funnel durations from audit log
-  const transitionDurations = useMemo(() => {
-    const durations: Record<string, number[]> = {};
-    // Group audit logs by lead_id
-    const byLead: Record<string, typeof auditLogs> = {};
-    for (const log of auditLogs) {
-      if (!byLead[log.lead_id]) byLead[log.lead_id] = [];
-      byLead[log.lead_id].push(log);
-    }
-
-    for (const logs of Object.values(byLead)) {
-      // logs are already sorted by created_at
-      for (let i = 0; i < logs.length; i++) {
-        const from = logs[i].old_value || '';
-        const to = logs[i].new_value || '';
-        const key = `${from}→${to}`;
-        const prevTime = i === 0
-          ? leads.find((l) => l.id === logs[i].lead_id)?.created_at
-          : logs[i - 1].created_at;
-        if (prevTime) {
-          const dur = new Date(logs[i].created_at).getTime() - new Date(prevTime).getTime();
-          if (dur > 0) {
-            if (!durations[key]) durations[key] = [];
-            durations[key].push(dur);
-          }
-        }
-      }
-    }
-
-    // Filter to main funnel transitions and compute averages
-    const results: { from: string; to: string; avgMs: number; count: number }[] = [];
-    for (let i = 0; i < funnelOrder.length - 1; i++) {
-      const key = `${funnelOrder[i]}→${funnelOrder[i + 1]}`;
-      const times = durations[key];
-      if (times && times.length > 0) {
-        results.push({
-          from: funnelOrder[i],
-          to: funnelOrder[i + 1],
-          avgMs: times.reduce((a, b) => a + b, 0) / times.length,
-          count: times.length,
-        });
-      } else {
-        results.push({ from: funnelOrder[i], to: funnelOrder[i + 1], avgMs: 0, count: 0 });
-      }
-    }
-    return results;
-  }, [auditLogs, leads]);
 
   const funnelData = funnelSteps.map((s) => ({
     ...s,
@@ -182,11 +122,10 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard title="Today's Leads" value={todayLeads.length} icon={Users} />
         <StatCard title="Total KG (Today)" value={`${stats.totalKg.toLocaleString()} kg`} subtitle={`B2C: ${stats.b2cKg.toLocaleString()} · B2B: ${stats.b2bKg.toLocaleString()}`} icon={Recycle} />
         <StatCard title="Est. Revenue (Today)" value={`Rp ${(stats.revenue / 1e6).toFixed(1)}M`} icon={DollarSign} />
-        <StatCard title="Conversion Rate" value={`${stats.conversion}%`} subtitle={`${stats.deals} deals closed`} icon={TrendingUp} />
       </div>
 
       {/* Chat Response Stats */}
@@ -195,30 +134,6 @@ export default function Dashboard() {
         <StatCard title="Unanswered Chats" value={stats.unanswered} icon={MessageCircle} />
         <StatCard title="Avg Response Time" value={formatDuration(stats.avgResponseMs)} subtitle="All chats · first reply" icon={Clock} />
       </div>
-
-      {/* Funnel Transition Durations */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><Timer className="h-4 w-4 text-primary" /> Avg Funnel Duration per Stage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-2">
-            {transitionDurations.map((t, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                {i === 0 && (
-                  <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium">{statusLabels[t.from as LeadStatus]}</span>
-                )}
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-semibold text-primary">{t.avgMs > 0 ? formatDuration(t.avgMs) : '-'}</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  {t.count > 0 && <span className="text-[10px] text-muted-foreground">{t.count}x</span>}
-                </div>
-                <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium">{statusLabels[t.to as LeadStatus]}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Funnel */}
