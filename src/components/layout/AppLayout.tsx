@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, FileText, Menu, X, Recycle,
-  ChevronLeft, ClipboardList, FormInput, LogOut,
+  ChevronLeft, ClipboardList, FormInput, LogOut, Contact, Radio,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,10 @@ const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'WhatsApp Inbox', icon: MessageSquare, path: '/inbox' },
   { label: 'Leads', icon: Users, path: '/leads' },
+  { label: 'Contacts', icon: Contact, path: '/contacts' },
+  { label: 'Broadcast', icon: Radio, path: '/broadcast' },
   { label: 'Forms', icon: FormInput, path: '/forms' },
   { label: 'Submissions', icon: ClipboardList, path: '/form-submissions' },
-  { label: 'Embed Form', icon: FileText, path: '/embed-form' },
   { label: 'Settings', icon: Settings, path: '/settings' },
 ];
 

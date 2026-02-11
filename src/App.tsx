@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import DashboardDetail from "./pages/DashboardDetail";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import Leads from "./pages/Leads";
+import Contacts from "./pages/Contacts";
+import Broadcast from "./pages/Broadcast";
 import FormManager from "./pages/FormManager";
 import FormSubmissions from "./pages/FormSubmissions";
 import EmbedForm from "./pages/EmbedForm";
@@ -40,6 +42,8 @@ function ProtectedRoutes() {
         <Route path="/dashboard-detail" element={<DashboardDetail />} />
         <Route path="/inbox" element={<WhatsAppInbox />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/contacts" element={<Contacts />} />
+        <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/forms" element={<FormManager />} />
         <Route path="/form-submissions" element={<FormSubmissions />} />
         <Route path="/embed-form" element={<EmbedForm />} />
