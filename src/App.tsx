@@ -12,7 +12,6 @@ import Leads from "./pages/Leads";
 import Contacts from "./pages/Contacts";
 import Broadcast from "./pages/Broadcast";
 import FormManager from "./pages/FormManager";
-import FormSubmissions from "./pages/FormSubmissions";
 import EmbedForm from "./pages/EmbedForm";
 import PublicForm from "./pages/PublicForm";
 import Settings from "./pages/Settings";
@@ -45,7 +44,6 @@ function ProtectedRoutes() {
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/forms" element={<FormManager />} />
-        <Route path="/form-submissions" element={<FormSubmissions />} />
         <Route path="/embed-form" element={<EmbedForm />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />

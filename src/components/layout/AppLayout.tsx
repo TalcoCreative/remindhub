@@ -15,7 +15,6 @@ const navItems = [
   { label: 'Contacts', icon: Contact, path: '/contacts' },
   { label: 'Broadcast', icon: Radio, path: '/broadcast' },
   { label: 'Forms', icon: FormInput, path: '/forms' },
-  { label: 'Submissions', icon: ClipboardList, path: '/form-submissions' },
   { label: 'Settings', icon: Settings, path: '/settings' },
 ];
 

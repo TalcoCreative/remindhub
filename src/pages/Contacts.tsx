@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Search, Plus, Upload, Filter, X, UserPlus, MessageCircle, Phone, Building2, MapPin,
-  CheckCircle2, XCircle, Loader2, Edit, Eye,
+  Search, Plus, Upload, Filter, X, MessageCircle, Phone, Building2, MapPin,
+  CheckCircle2, XCircle, Loader2, Edit, Eye, Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { statusLabels, statusColors, type LeadStatus } from '@/data/dummy';
@@ -198,6 +198,15 @@ export default function Contacts() {
         </div>
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+            const template = 'name,phone,type,company,area,source\nJohn Doe,628123456789,b2c,PT Example,Jakarta,manual\n';
+            const blob = new Blob([template], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'contacts_template.csv'; a.click();
+          }}>
+            <Download className="h-4 w-4" /> Template CSV
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()}>
             <Upload className="h-4 w-4" /> Import CSV
           </Button>
@@ -302,14 +311,12 @@ export default function Contacts() {
                   <th className="px-3 py-2">Source</th>
                   <th className="px-3 py-2">Area</th>
                   <th className="px-3 py-2">PIC</th>
-                  <th className="px-3 py-2">Contacted?</th>
-                  <th className="px-3 py-2">Lead Status</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
+                   <th className="px-3 py-2">Contacted?</th>
+                   <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((c) => {
-                  const leadStatus = getLeadStatus(c);
+              {filteredContacts.map((c) => {
                   return (
                     <tr key={c.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                       <td className="px-3 py-2 font-medium">{c.name}</td>
@@ -325,22 +332,10 @@ export default function Contacts() {
                         }
                       </td>
                       <td className="px-3 py-2">
-                        {leadStatus ? (
-                          <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-medium', statusColors[leadStatus])}>
-                            {statusLabels[leadStatus]}
-                          </span>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
                           {!c.is_contacted && (
                             <Button variant="default" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => contactNow(c)}>
                               <MessageCircle className="h-3 w-3" /> Contact Now
-                            </Button>
-                          )}
-                          {!c.lead_id && (
-                            <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => createLeadFromContact.mutate(c)}>
-                              <UserPlus className="h-3 w-3" /> Lead
                             </Button>
                           )}
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditContact(c)}>
@@ -352,7 +347,7 @@ export default function Contacts() {
                   );
                 })}
                 {filteredContacts.length === 0 && (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No contacts found</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No contacts found</td></tr>
                 )}
               </tbody>
             </table>

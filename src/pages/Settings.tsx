@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Wifi, WifiOff, Key, Globe, Shield, UserPlus, Loader2, Users, MoreHorizontal } from 'lucide-react';
+import { Wifi, WifiOff, Key, Globe, Shield, UserPlus, Loader2, Users, MoreHorizontal, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ export default function Settings() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', password: '', display_name: '', role: 'operator' });
   const [inviting, setInviting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: isAdmin } = useQuery({
     queryKey: ['is-admin'],
@@ -75,6 +77,20 @@ export default function Settings() {
       qc.invalidateQueries({ queryKey: ['all-users'] });
       toast({ title: 'Role Updated' });
     },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('delete-user', { body: { user_id: userId } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-users'] });
+      toast({ title: 'User Deleted' });
+      setDeleteTarget(null);
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const handleInvite = async () => {
@@ -160,14 +176,19 @@ export default function Settings() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                               <DropdownMenuContent align="end">
                                 {['admin', 'operator', 'viewer'].map((role) => (
                                   <DropdownMenuItem key={role} onClick={() => updateRole.mutate({ userId: u.user_id, newRole: role })}>
                                     Set as <span className="ml-1 capitalize font-medium">{role}</span>
                                     {u.roles[0] === role && <span className="ml-auto text-primary">✓</span>}
                                   </DropdownMenuItem>
                                 ))}
-                              </DropdownMenuContent>
+                                {u.user_id !== session?.user?.id && (
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget({ id: u.user_id, name: u.display_name || 'this user' })}>
+                                    <Trash2 className="h-4 w-4 mr-1" /> Delete User
+                                  </DropdownMenuItem>
+                                )}
+                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         )}
@@ -296,6 +317,24 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && deleteUser.mutate(deleteTarget.id)}>
+              {deleteUser.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
