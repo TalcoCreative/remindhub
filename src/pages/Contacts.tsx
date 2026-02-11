@@ -355,7 +355,7 @@ export default function Contacts() {
                       <td className="px-3 py-2 text-muted-foreground">{c.area || '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{c.assigned_pic || '—'}</td>
                       <td className="px-3 py-2">
-                        {c.is_contacted
+                        {c.chat_id
                           ? <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="h-3.5 w-3.5" /> Yes</span>
                           : <span className="flex items-center gap-1 text-xs text-warning"><XCircle className="h-3.5 w-3.5" /> No</span>
                         }
