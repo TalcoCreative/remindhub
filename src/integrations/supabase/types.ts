@@ -83,6 +83,7 @@ export type Database = {
       chats: {
         Row: {
           assigned_pic: string | null
+          channel: string
           contact_name: string
           contact_phone: string
           created_at: string
@@ -98,6 +99,7 @@ export type Database = {
         }
         Insert: {
           assigned_pic?: string | null
+          channel?: string
           contact_name: string
           contact_phone: string
           created_at?: string
@@ -113,6 +115,7 @@ export type Database = {
         }
         Update: {
           assigned_pic?: string | null
+          channel?: string
           contact_name?: string
           contact_phone?: string
           created_at?: string
@@ -431,6 +434,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          channel: string | null
           chat_id: string
           created_at: string
           id: string
@@ -438,6 +442,7 @@ export type Database = {
           text: string
         }
         Insert: {
+          channel?: string | null
           chat_id: string
           created_at?: string
           id?: string
@@ -445,6 +450,7 @@ export type Database = {
           text: string
         }
         Update: {
+          channel?: string | null
           chat_id?: string
           created_at?: string
           id?: string

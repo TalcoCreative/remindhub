@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { label: 'WhatsApp Inbox', icon: MessageSquare, path: '/inbox' },
+  { label: 'Inbox', icon: MessageSquare, path: '/inbox' },
   { label: 'Leads', icon: Users, path: '/leads' },
   { label: 'Contacts', icon: Contact, path: '/contacts' },
   { label: 'Broadcast', icon: Radio, path: '/broadcast' },

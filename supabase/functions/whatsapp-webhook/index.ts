@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const events = normalizePayload(body);
 
     for (const event of events) {
-      const { phone, name, message, sender, timestamp, mediaUrl, mediaType, roomId } = event;
+      const { phone, name, message, sender, timestamp, mediaUrl, mediaType, roomId, channel } = event;
 
       if (!phone || !message) {
         console.log("Skipping event - missing phone or message:", event);
@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
             last_timestamp: msgTimestamp,
             status: "new",
             unread: msgSender === "customer" ? 1 : 0,
+            channel: channel || "whatsapp",
           })
           .select("id")
           .single();
@@ -148,6 +149,7 @@ interface WebhookEvent {
   mediaUrl?: string;
   mediaType?: string;
   roomId?: string;
+  channel?: string;
 }
 
 // ─── Payload Normalization ────────────────────────────────────────────────────
@@ -178,6 +180,22 @@ function normalizePayload(body: any): WebhookEvent[] {
                     body.participant_type === "agent";
     const content = extractQontakContent(body);
 
+    // Map Qontak channel codes to our channel names
+    const qontakChannel = (body.room?.channel || "wa").toLowerCase();
+    const channelMap: Record<string, string> = {
+      wa: "whatsapp", whatsapp: "whatsapp",
+      ig: "instagram", instagram: "instagram",
+      fb: "facebook", facebook: "facebook", fb_messenger: "facebook",
+      email: "email",
+      telegram: "telegram", tg: "telegram",
+      twitter: "twitter", x: "twitter",
+      line: "line",
+      webchat: "web_chat", web_chat: "web_chat", livechat: "web_chat",
+      ecommerce: "ecommerce", tokopedia: "ecommerce", shopee: "ecommerce",
+      call: "call",
+    };
+    const channel = channelMap[qontakChannel] || "whatsapp";
+
     return [{
       phone,
       name,
@@ -187,6 +205,7 @@ function normalizePayload(body: any): WebhookEvent[] {
       mediaUrl: content.mediaUrl,
       mediaType: content.mediaType,
       roomId: body.room_id,
+      channel,
     }];
   }
 
