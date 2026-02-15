@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { statusLabels, statusColors, quickReplies, type LeadStatus } from '@/data/dummy';
+import { channelLabels, channelColors, channelList, type Channel } from '@/data/channels';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
+import { useAppMode } from '@/hooks/useAppMode';
 
 type DbChat = Tables<'chats'>;
 type DbMessage = Tables<'messages'>;
@@ -28,6 +30,7 @@ const statusOptions: LeadStatus[] = ['new', 'not_followed_up', 'followed_up', 'i
 
 export default function WhatsAppInbox() {
   const qc = useQueryClient();
+  const { isLive } = useAppMode();
   const { data: picList = [] } = useTeamMembers();
   const [searchParams] = useSearchParams();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(searchParams.get('chat'));
@@ -38,6 +41,7 @@ export default function WhatsAppInbox() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPic, setFilterPic] = useState<string>('all');
   const [filterAnswered, setFilterAnswered] = useState<string>('all');
+  const [filterChannel, setFilterChannel] = useState<string>('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: chats = [], isLoading } = useQuery({
@@ -61,9 +65,7 @@ export default function WhatsAppInbox() {
 
   const selectedChat = chats.find((c) => c.id === selectedChatId) ?? null;
 
-  const isAnswered = (chat: DbChat) => {
-    return (chat as any).is_answered === true;
-  };
+  const isAnswered = (chat: DbChat) => (chat as any).is_answered === true;
 
   const getResponseTime = (chat: DbChat) => {
     const firstResponse = (chat as any).first_response_at;
@@ -76,6 +78,10 @@ export default function WhatsAppInbox() {
     return `${Math.floor(hrs / 24)}d`;
   };
 
+  const getChatChannel = (chat: DbChat): Channel => {
+    return ((chat as any).channel as Channel) || 'whatsapp';
+  };
+
   const filteredChats = useMemo(() => {
     return chats.filter((c) => {
       if (search && !c.contact_name.toLowerCase().includes(search.toLowerCase()) && !(c.last_message ?? '').toLowerCase().includes(search.toLowerCase())) return false;
@@ -83,11 +89,12 @@ export default function WhatsAppInbox() {
       if (filterPic !== 'all' && (c.assigned_pic ?? '') !== filterPic) return false;
       if (filterAnswered === 'answered' && !isAnswered(c)) return false;
       if (filterAnswered === 'unanswered' && isAnswered(c)) return false;
+      if (filterChannel !== 'all' && getChatChannel(c) !== filterChannel) return false;
       return true;
     });
-  }, [chats, search, filterStatus, filterPic, filterAnswered]);
+  }, [chats, search, filterStatus, filterPic, filterAnswered, filterChannel]);
 
-  const hasActiveFilter = filterStatus !== 'all' || filterPic !== 'all' || filterAnswered !== 'all';
+  const hasActiveFilter = filterStatus !== 'all' || filterPic !== 'all' || filterAnswered !== 'all' || filterChannel !== 'all';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -149,6 +156,7 @@ export default function WhatsAppInbox() {
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Inbox</h2>
+            {isLive && <Badge className="bg-green-600 text-white text-[9px] h-4 px-1.5">LIVE</Badge>}
             <Badge variant="secondary" className="ml-auto text-[10px] h-5">{filteredChats.length}/{chats.length}</Badge>
             <Button variant={hasActiveFilter ? 'default' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setShowFilters(!showFilters)}>
               <Filter className="h-3.5 w-3.5" />
@@ -165,11 +173,22 @@ export default function WhatsAppInbox() {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase text-muted-foreground">Filters</span>
                 {hasActiveFilter && (
-                  <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => { setFilterStatus('all'); setFilterPic('all'); setFilterAnswered('all'); }}>
+                  <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => { setFilterStatus('all'); setFilterPic('all'); setFilterAnswered('all'); setFilterChannel('all'); }}>
                     <X className="h-3 w-3 mr-0.5" /> Reset
                   </Button>
                 )}
               </div>
+              <Select value={filterChannel} onValueChange={setFilterChannel}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Channels</SelectItem>
+                  {channelList.map((ch) => (
+                    <SelectItem key={ch} value={ch}>{channelLabels[ch]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue placeholder="Status" />
@@ -208,39 +227,35 @@ export default function WhatsAppInbox() {
 
         <ScrollArea className="flex-1">
           {filteredChats.length === 0 && (
-            <div className="p-4 text-center text-xs text-muted-foreground">No chats match filters</div>
+            <div className="p-4 text-center text-xs text-muted-foreground">
+              {isLive ? 'No conversations yet. Data comes from Qontak API.' : 'No chats match filters'}
+            </div>
           )}
-          {/* Mobile: 2-col grid of compact cards; Desktop: standard list */}
           <div className="grid grid-cols-2 gap-1.5 p-1.5 sm:grid-cols-1 sm:gap-0 sm:p-0">
             {filteredChats.map((chat) => {
               const answered = isAnswered(chat);
+              const channel = getChatChannel(chat);
               return (
                 <ContextMenu key={chat.id}>
                   <ContextMenuTrigger>
-                    {/* Mobile: compact card */}
                     <div
                       className={cn(
                         'cursor-pointer transition-colors hover:bg-muted/50 active:bg-accent/80',
-                        // Mobile card style
                         'rounded-lg border border-border p-2 sm:rounded-none sm:border-0 sm:border-b sm:px-2.5 sm:py-2',
-                        // Desktop list style
                         'flex flex-col gap-1 sm:flex-row sm:gap-2.5',
                         selectedChatId === chat.id && 'bg-accent',
                       )}
                       onClick={() => setSelectedChatId(chat.id)}
                     >
-                      {/* Avatar + status - hidden on mobile for compactness */}
                       <div className="relative hidden sm:block">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                           <User className="h-4 w-4" />
                         </div>
                         <div className={cn('absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card', answered ? 'bg-success' : 'bg-warning')} />
                       </div>
-                      {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <div className="flex items-center gap-1 min-w-0">
-                            {/* Mobile inline status dot */}
                             <div className={cn('h-2 w-2 rounded-full shrink-0 sm:hidden', answered ? 'bg-success' : 'bg-warning')} />
                             <p className="truncate text-xs font-semibold">{chat.contact_name}</p>
                           </div>
@@ -250,6 +265,10 @@ export default function WhatsAppInbox() {
                         </div>
                         <p className="truncate text-[11px] text-muted-foreground leading-tight">{chat.last_message}</p>
                         <div className="mt-0.5 flex items-center gap-1 flex-wrap">
+                          {/* Channel badge */}
+                          <span className={cn('rounded-full px-1.5 py-0.5 text-[8px] font-medium leading-none', channelColors[channel] ?? 'bg-muted text-muted-foreground')}>
+                            {channelLabels[channel] ?? channel}
+                          </span>
                           <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-none', statusColors[chat.status as LeadStatus] ?? 'bg-muted text-muted-foreground')}>
                             {statusLabels[chat.status as LeadStatus] ?? chat.status}
                           </span>
@@ -317,6 +336,9 @@ export default function WhatsAppInbox() {
               <p className="text-sm font-semibold">{selectedChat.contact_name}</p>
               <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <Phone className="h-3 w-3" /> +{selectedChat.contact_phone}
+                <span className={cn('ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium', channelColors[getChatChannel(selectedChat)] ?? 'bg-muted text-muted-foreground')}>
+                  {channelLabels[getChatChannel(selectedChat)] ?? getChatChannel(selectedChat)}
+                </span>
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
